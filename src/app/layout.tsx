@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Session } from '@supabase/supabase-js';
@@ -34,13 +35,20 @@ export default async function RootLayout({ children }: RootLayoutProps) {
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
-        <AuthProvider initialSession={session}>
-          <div className="min-h-screen bg-background">
-            {children}
-            <Toaster position="top-center" />
-          </div>
-        </AuthProvider>
+      <body className={`font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider initialSession={session}>
+            <div className="min-h-screen bg-background text-foreground">
+              {children}
+              <Toaster position="top-center" />
+            </div>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

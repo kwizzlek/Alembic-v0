@@ -15,8 +15,6 @@ const nextConfig: NextConfig = {
 
     return config;
   },
-  // Enable font optimization (now that we're using SWC)
-  optimizeFonts: true,
   // Enable React strict mode
   reactStrictMode: true,
   // Configure images
