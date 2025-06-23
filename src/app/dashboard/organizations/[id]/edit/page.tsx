@@ -14,8 +14,16 @@ import {
   getOrganizationMembers, 
   inviteMember, 
   removeMember,
+  getOrganizations,
   type OrganizationMember
 } from '@/lib/api/organizations';
+
+type Organization = {
+  id: string;
+  name: string;
+  role: string;
+  created_at: string;
+};
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Table, 
@@ -62,25 +70,36 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
   useEffect(() => {
     const loadData = async () => {
       try {
-        // In a real app, you would fetch the organization data here
-        // const { data: org } = await getOrganizationById(params.id);
-        // setOrganizationName(org.name);
+        // Fetch the list of organizations the user has access to
+        const { data: organizations, error } = await getOrganizations();
         
-        // For now, just set a placeholder
-        setOrganizationName('Organization Name');
+        if (error) throw error;
+        
+        // Find the current organization
+        const currentOrg = organizations.find(org => org.id === params.id);
+        
+        if (!currentOrg) {
+          toast.error('Organization not found');
+          router.push('/dashboard');
+          return;
+        }
+        
+        // Set the organization name from the fetched data
+        setOrganizationName(currentOrg.name);
         
         // Load members
         await loadMembers();
       } catch (error) {
         console.error('Error loading data:', error);
-        toast.error('Failed to load data');
+        toast.error('Failed to load organization data');
+        router.push('/dashboard');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [params.id]);
+  }, [params.id, router]);
   
   const loadMembers = async () => {
     setIsLoadingMembers(true);
@@ -209,7 +228,7 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
                   />
                 </div>
               </CardContent>
-              <CardFooter className="border-t px-6 py-4 flex flex-col space-y-4">
+              <CardFooter className="border-t px-6 py-4">
                 <div className="flex items-center justify-between w-full">
                   <Button 
                     type="button" 
@@ -221,19 +240,6 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-                
-                <div className="w-full pt-4 border-t">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={isSubmitting}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Organization
                   </Button>
                 </div>
               </CardFooter>
@@ -331,6 +337,36 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Danger Zone */}
+          <Card className="mt-6 border-destructive/20">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardDescription>
+                These actions are irreversible. Proceed with caution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-4">
+                  <div>
+                    <h4 className="font-medium">Delete Organization</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete this organization and all its data.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Organization
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
