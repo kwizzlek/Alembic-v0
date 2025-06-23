@@ -48,25 +48,6 @@ export default function OrganizationsPage() {
     }
   }, [user, loading, router]);
 
-  const handleCreateOrganization = async () => {
-    try {
-      const name = prompt('Enter organization name:');
-      if (!name) return;
-
-      const { data, error } = await createOrganization(name);
-      
-      if (error) throw error;
-      
-      if (data) {
-        setOrganizations(prev => [data, ...prev] as Organization[]);
-        toast.success(`Created organization: ${data.name}`);
-      }
-    } catch (error) {
-      console.error('Error creating organization:', error);
-      toast.error('Failed to create organization');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -92,8 +73,10 @@ export default function OrganizationsPage() {
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">Your Organizations</h2>
-            <Button onClick={handleCreateOrganization}>
-              Create New Organization
+            <Button asChild>
+              <Link href="/dashboard/organizations/new">
+                Create New Organization
+              </Link>
             </Button>
           </div>
 
@@ -101,8 +84,10 @@ export default function OrganizationsPage() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-muted-foreground">You're not a member of any organizations yet.</p>
-                <Button className="mt-4" onClick={handleCreateOrganization}>
-                  Create your first organization
+                <Button className="mt-4" asChild>
+                  <Link href="/dashboard/organizations/new">
+                    Create your first organization
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
