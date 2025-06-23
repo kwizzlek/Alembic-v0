@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +51,12 @@ import {
 import { ArrowLeft, Mail, Plus, Trash2, User, UserPlus } from 'lucide-react'; // Added UserPlus icon
 import { Badge } from '@/components/ui/badge'; // Added Badge component
 
-export default function EditOrganizationPage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: { id: string }
+}
+
+export default function EditOrganizationPage({ params }: PageProps) {
+  const { id } = params;
   const router = useRouter();
   const [organizationName, setOrganizationName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +73,7 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
 
   // Load organization data and members
   useEffect(() => {
+    if (!id) return;
     const loadData = async () => {
       try {
         // Fetch the list of organizations the user has access to
@@ -76,7 +82,7 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
         if (error) throw error;
         
         // Find the current organization
-        const currentOrg = organizations.find(org => org.id === params.id);
+        const currentOrg = organizations.find(org => org.id === id);
         
         if (!currentOrg) {
           toast.error('Organization not found');
@@ -99,17 +105,19 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
     };
 
     loadData();
-  }, [params.id, router]);
+  }, [id, router]);
   
   const loadMembers = async () => {
     setIsLoadingMembers(true);
     try {
-      const { data, error } = await getOrganizationMembers(params.id);
+      const { data: membersData, error } = await getOrganizationMembers(id);
+      
       if (error) throw error;
-      setMembers(data);
+      
+      setMembers(membersData || []);
     } catch (error) {
       console.error('Error loading members:', error);
-      toast.error('Failed to load members');
+      toast.error('Failed to load organization members');
     } finally {
       setIsLoadingMembers(false);
     }
@@ -118,14 +126,11 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!inviteEmail.trim()) {
-      toast.error('Email is required');
-      return;
-    }
+    if (!inviteEmail.trim() || !inviteRole) return;
     
     setIsInviting(true);
     try {
-      const { success, error } = await inviteMember(params.id, inviteEmail, inviteRole);
+      const { error } = await inviteMember(id, inviteEmail, inviteRole);
       
       if (error) throw error;
       
@@ -136,18 +141,20 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
       await loadMembers();
     } catch (error) {
       console.error('Error inviting member:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send invitation');
+      toast.error('Failed to send invitation');
     } finally {
       setIsInviting(false);
     }
   };
   
   const handleRemoveMember = async (userId: string) => {
+    if (!userId) return;
+    
     if (!confirm('Are you sure you want to remove this member?')) return;
     
     setIsRemoving(userId);
     try {
-      const { success, error } = await removeMember(params.id, userId);
+      const { error } = await removeMember(id, userId);
       
       if (error) throw error;
       
@@ -173,12 +180,12 @@ export default function EditOrganizationPage({ params }: { params: { id: string 
     
     try {
       // Update organization
-      const { error } = await updateOrganization(params.id, { name: organizationName });
+      const { error } = await updateOrganization(id, { name: organizationName });
       
       if (error) throw error;
       
       toast.success('Organization updated successfully');
-      router.push(`/dashboard/organizations/${params.id}`);
+      router.push(`/dashboard/organizations/${id}`);
     } catch (error) {
       console.error('Error updating organization:', error);
       toast.error('Failed to update organization');
