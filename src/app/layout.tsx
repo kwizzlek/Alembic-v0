@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServerClient, getSession } from '@/lib/supabase/server';
 import type { Session } from '@supabase/supabase-js';
 import type { ReactNode } from 'react';
 
@@ -27,7 +27,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   
   try {
     const supabase = await getSupabaseServerClient();
-    const { data } = await supabase.auth.getSession();
+    // Use our updated getSession which verifies the user
+    const { data } = await getSession();
     session = data.session;
   } catch (error) {
     console.error('Error getting session:', error);

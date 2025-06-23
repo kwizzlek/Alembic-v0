@@ -49,7 +49,18 @@ export async function getSupabaseServerClient() {
 
 export async function getSession() {
   const supabase = await getSupabaseServerClient()
-  return await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { data: { session: null } }
+  
+  // Verify the session by getting the user
+  const { data: { user }, error } = await supabase.auth.getUser(session.access_token)
+  if (error || !user) {
+    console.error('Session verification failed:', error)
+    return { data: { session: null } }
+  }
+  
+  // Return the verified session
+  return { data: { session: { ...session, user } } }
 }
 
 export async function getUser() {

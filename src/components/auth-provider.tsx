@@ -27,20 +27,54 @@ export function AuthProvider({ children, initialSession = null }: AuthProviderPr
   const router = useRouter();
 
   useEffect(() => {
-    // Only set up the auth state listener if we don't have an initial session
-    if (!initialSession) {
-      setLoading(true);
-      
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const verifyAndSetSession = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        setSession(null);
+        setUser(null);
         setLoading(false);
-      });
+        return;
+      }
 
-      return () => {
-        subscription?.unsubscribe();
-      };
-    }
+      // Verify the session by getting the user
+      const { data: { user }, error } = await supabase.auth.getUser(currentSession.access_token);
+      if (error || !user) {
+        console.error('Session verification failed:', error);
+        setSession(null);
+        setUser(null);
+      } else {
+        const verifiedSession = { ...currentSession, user };
+        setSession(verifiedSession);
+        setUser(user);
+      }
+      setLoading(false);
+    };
+
+    // Set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        // For auth state changes, we still want to verify the session
+        const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
+        if (!error && user) {
+          const verifiedSession = { ...session, user };
+          setSession(verifiedSession);
+          setUser(user);
+        } else {
+          setSession(null);
+          setUser(null);
+        }
+      } else {
+        setSession(null);
+        setUser(null);
+      }
+    });
+
+    // Initial verification
+    verifyAndSetSession();
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, [initialSession, supabase.auth]);
 
   const signOut = async () => {
