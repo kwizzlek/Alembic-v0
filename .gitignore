@@ -12,6 +12,12 @@
 
 # testing
 /coverage
+/playwright-report/
+/playwright/.cache/
+/playwright/test-results/
+/test-results/
+/playwright/.screenshots/
+/playwright/.auth/
 
 # next.js
 /.next/
@@ -39,3 +45,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+*.jpeg
+*.jpg
+*.png
+*.jpeg
+*.gif
+*.zip
