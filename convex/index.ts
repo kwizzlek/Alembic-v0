@@ -9,6 +9,23 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import OpenAI from "openai";
 
+// Test endpoint to check environment variables
+export const testEnvVars = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    console.log("Test environment variables:", {
+      API_BASE_URL: process.env.API_BASE_URL,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' : 'Not set',
+      ALL_ENV_VARS: Object.keys(process.env).filter(k => k.includes('API') || k.includes('CONVEX'))
+    });
+    return {
+      API_BASE_URL: process.env.API_BASE_URL,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+      allVars: Object.keys(process.env)
+    };
+  },
+});
+
 /**
  * Create a new channel.
  */
@@ -115,33 +132,69 @@ export const sendMessage = mutation({
   },
 });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: "https://api.perplexity.ai",
-});
-
 export const generateResponse = internalAction({
   args: {
     channelId: v.id("channels"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const context = await ctx.runQuery(internal.index.loadContext, {
-      channelId: args.channelId,
+    // Debug logging for environment variables
+    console.log("Initializing OpenAI client with baseURL:", process.env.API_BASE_URL);
+    console.log("Environment variables:", {
+      API_BASE_URL: process.env.API_BASE_URL,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' : 'Not set'
     });
-    const response = await openai.chat.completions.create({
-      model: "sonar-pro",
-      messages: context,
-    });
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error("No content in response");
+
+    // Validate environment variables
+    if (!process.env.API_BASE_URL) {
+      throw new Error('API_BASE_URL environment variable is not set');
     }
-    await ctx.runMutation(internal.index.writeAgentResponse, {
-      channelId: args.channelId,
-      content,
-    });
-    return null;
+    
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY environment variable is not set');
+    }
+
+    try {
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        baseURL: process.env.API_BASE_URL,
+      });
+
+      console.log("Loading conversation context...");
+      const context = await ctx.runQuery(internal.index.loadContext, {
+        channelId: args.channelId,
+      });
+      console.log("Context loaded, making API call...");
+
+      const response = await openai.chat.completions.create({
+        model: "sonar-pro",
+        messages: context,
+      });
+      
+      console.log("API response received:", { 
+        id: response.id,
+        model: response.model,
+        usage: response.usage,
+        choices: response.choices.length
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No content in response");
+      }
+
+      console.log("Writing agent response to database...");
+      await ctx.runMutation(internal.index.writeAgentResponse, {
+        channelId: args.channelId,
+        content,
+      });
+      
+      console.log("Response written successfully");
+      return null;
+    } catch (error) {
+      console.error("Error in generateResponse:", error);
+      throw error;
+    }
   },
 });
 
