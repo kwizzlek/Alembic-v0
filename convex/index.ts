@@ -327,12 +327,32 @@ export const sendMessage = mutation({
       updatedAt: now,
     });
 
+    // Check if this is the first message in the thread
+    const existingMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_thread", q => q.eq("threadId", args.threadId))
+      .collect();
+    
+    const isFirstMessage = existingMessages.length === 0;
+    
+    // If this is the first message, update the thread title with a truncated version
+    if (isFirstMessage && args.content) {
+      const truncatedTitle = args.content.length > 50 
+        ? args.content.substring(0, 47) + '...' 
+        : args.content;
+      
+      await ctx.db.patch(args.threadId, {
+        title: truncatedTitle,
+        updatedAt: now,
+      });
+    }
+    
     // Add the message with createdAt set to the current timestamp
     const messageData: any = {
       threadId: args.threadId,
       authorId: args.authorId,
       content: args.content,
-      createdAt: now, // Always set createdAt to the current timestamp
+      createdAt: now,
     };
     
     // Only include channelId if it exists in the thread
