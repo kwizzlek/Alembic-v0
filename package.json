@@ -16,6 +16,7 @@
     "test:e2e:update-snapshots": "playwright test --update-snapshots"
   },
   "dependencies": {
+    "@convex-dev/workflow": "^0.2.4",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",

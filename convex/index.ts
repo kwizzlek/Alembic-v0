@@ -8,7 +8,12 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import OpenAI from "openai";
+// getThreadInternal is now imported via internal API
 import { Id } from "./_generated/dataModel";
+
+// Re-export workflow and threads for use in other files
+export * from "./workflow";
+export * from "./threads";
 
 // Test endpoint to check environment variables
 export const testEnvVars = internalAction({
@@ -44,19 +49,87 @@ export const createChannel = mutation({
 });
 
 /**
+ * Get or create the default channel.
+ */
+export const getOrCreateDefaultChannel = query({
+  args: {},
+  handler: async (ctx) => {
+    // Try to find an existing default channel
+    const defaultChannel = await ctx.db
+      .query("channels")
+      .filter((q) => q.eq(q.field("name"), "default"))
+      .first();
+
+    if (defaultChannel) {
+      return defaultChannel;
+    }
+
+    // If no default channel exists, return null
+    // (we'll handle creation in a separate mutation to keep queries pure)
+    return null;
+  },
+});
+
+/**
+ * Create the default channel if it doesn't exist.
+ */
+export const ensureDefaultChannel = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const defaultChannel = await ctx.db
+      .query("channels")
+      .filter((q) => q.eq(q.field("name"), "default"))
+      .first();
+
+    if (defaultChannel) {
+      return defaultChannel._id;
+    }
+
+    // Create the default channel if it doesn't exist
+    return await ctx.db.insert("channels", {
+      name: "default",
+    });
+  },
+});
+
+/**
  * Get or create a user.
+ * @param name - The user's email address
+ * @returns The ID of the user
  */
 export const getOrCreateUser = mutation({
-  args: { name: v.string() },
+  args: { 
+    name: v.string() 
+  },
+  returns: v.id("users"),
   handler: async (ctx, args) => {
-    const user = await ctx.db
+    // Validate email format
+    if (!args.name.includes('@')) {
+      throw new Error('Invalid email format');
+    }
+
+    // Check if user already exists
+    const existingUser = await ctx.db
       .query("users")
       .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
-    if (user) {
-      return user._id;
+      
+    if (existingUser) {
+      return existingUser._id;
     }
-    return await ctx.db.insert("users", { name: args.name });
+    
+    // Create new user
+    try {
+      const userId = await ctx.db.insert("users", { 
+        name: args.name,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now()
+      });
+      return userId;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new Error('Failed to create user');
+    }
   },
 });
 
@@ -70,10 +143,14 @@ export const listThreads = query({
   returns: v.array(
     v.object({
       _id: v.id("threads"),
+      _creationTime: v.optional(v.number()),
+      channelId: v.id("channels"),
       title: v.string(),
       updatedAt: v.number(),
+      createdAt: v.optional(v.number()),
       messageCount: v.number(),
       preview: v.optional(v.string()),
+      lastMessageAt: v.optional(v.number()),
     })
   ),
   handler: async (ctx, args) => {
@@ -86,24 +163,34 @@ export const listThreads = query({
     return Promise.all(
       threads.map(async (thread) => {
         // Get the most recent message for preview
-        const messages = await ctx.db
+        const lastMessage = await ctx.db
           .query("messages")
-          .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+          .filter((q) => 
+            q.and(
+              q.eq(q.field("threadId"), thread._id),
+              q.neq(q.field("threadId"), undefined) // Ensure threadId is defined
+            )
+          )
           .order("desc")
-          .collect();
-        const recentMessage = messages[0];
+          .first();
 
         // Get message count
+        const messages = await ctx.db
+          .query("messages")
+          .filter((q) => q.eq(q.field("threadId"), thread._id))
+          .collect();
         const messageCount = messages.length;
 
         return {
-          ...thread,
+          _id: thread._id,
+          _creationTime: (thread as any)._creationTime,
+          channelId: thread.channelId,
+          title: thread.title,
+          updatedAt: lastMessage?.createdAt ?? thread.updatedAt,
+          createdAt: thread.createdAt,
           messageCount,
-          preview: recentMessage ? 
-            (recentMessage.content.length > 100 
-              ? recentMessage.content.substring(0, 100) + '...' 
-              : recentMessage.content)
-            : 'New thread',
+          preview: lastMessage?.content,
+          lastMessageAt: lastMessage?.createdAt,
         };
       })
     );
@@ -165,12 +252,14 @@ export const listMessages = query({
     v.object({
       _id: v.id("messages"),
       _creationTime: v.number(),
-      threadId: v.id("threads"),
+      // threadId is now optional in the schema
+      threadId: v.optional(v.id("threads")),
       channelId: v.id("channels"),
       authorId: v.optional(v.id("users")),
       authorName: v.optional(v.string()),
       content: v.string(),
-      createdAt: v.number(),
+      // createdAt is optional in the schema but we'll provide a default value
+      createdAt: v.optional(v.number()),
     })
   ),
   handler: async (ctx, args) => {
@@ -179,14 +268,22 @@ export const listMessages = query({
       throw new Error("Thread not found");
     }
 
-    const messages = await ctx.db
+    // First get all messages in the thread
+    let messages = await ctx.db
       .query("messages")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .filter((q) => q.eq(q.field("threadId"), args.threadId))
       .order("asc") // Fetch oldest messages first
       .collect();
+      
+    // For any messages missing createdAt, use _creationTime as a fallback
+    const messagesWithCreatedAt = messages.map(message => ({
+      ...message,
+      // Use _creationTime as a fallback for createdAt
+      createdAt: message.createdAt ?? message._creationTime,
+    }));
 
     return Promise.all(
-      messages.map(async (message) => {
+      messagesWithCreatedAt.map(async (message) => {
         if (message.authorId) {
           const author = await ctx.db.get(message.authorId);
           return {
@@ -230,14 +327,20 @@ export const sendMessage = mutation({
       updatedAt: now,
     });
 
-    // Add the message
-    await ctx.db.insert("messages", {
+    // Add the message with createdAt set to the current timestamp
+    const messageData: any = {
       threadId: args.threadId,
-      channelId: thread.channelId,
       authorId: args.authorId,
       content: args.content,
-      createdAt: now,
-    });
+      createdAt: now, // Always set createdAt to the current timestamp
+    };
+    
+    // Only include channelId if it exists in the thread
+    if (thread.channelId) {
+      messageData.channelId = thread.channelId;
+    }
+    
+    await ctx.db.insert("messages", messageData);
 
     // Schedule AI response
     await ctx.scheduler.runAfter(0, internal.index.generateResponse, {
@@ -276,7 +379,7 @@ export const generateResponse = internalAction({
       });
 
       console.log("Loading conversation context...");
-      const thread = await ctx.runQuery(internal.index.getThreadInternal, {
+      const thread = await ctx.runQuery(internal.getThreadInternal.default, {
         threadId: args.threadId,
       });
       
@@ -324,7 +427,7 @@ export const loadContext = internalQuery({
   },
   returns: v.array(
     v.object({
-      role: v.union(v.literal("user"), v.literal("assistant")),
+      role: v.union(v.literal("system"), v.literal("user"), v.literal("assistant")),
       content: v.string(),
     })
   ),
@@ -340,22 +443,30 @@ export const loadContext = internalQuery({
       .order("asc") // Get messages in chronological order
       .collect();
 
-    const result = [];
+    // Start with a system message
+    const result: Array<{role: "system" | "user" | "assistant", content: string}> = [{
+      role: "system",
+      content: "You are a helpful AI assistant."
+    }];
+
     for (const message of messages) {
-      if (message.authorId) {
-        const user = await ctx.db.get(message.authorId);
-        if (!user) {
-          throw new Error("User not found");
-        }
+      const isUserMessage = !!message.authorId;
+      const role = isUserMessage ? "user" : "assistant";
+      const lastMessage = result[result.length - 1];
+      
+      // If the last message has the same role, append to it
+      if (lastMessage.role === role) {
+        lastMessage.content += "\n" + message.content;
+      } else {
+        // Otherwise, add a new message
         result.push({
-          role: "user" as const,
+          role,
           content: message.content,
         });
-      } else {
-        result.push({ role: "assistant" as const, content: message.content });
       }
     }
     
+    console.log("Formatted messages for API:", JSON.stringify(result, null, 2));
     return result;
   },
 });
@@ -387,22 +498,4 @@ export const writeAgentResponse = internalMutation({
   },
 });
 
-export const getThreadInternal = internalQuery({
-  args: {
-    threadId: v.id("threads"),
-  },
-  returns: v.object({
-    _id: v.id("threads"),
-    channelId: v.id("channels"),
-    title: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }),
-  handler: async (ctx, args) => {
-    const thread = await ctx.db.get(args.threadId);
-    if (!thread) {
-      throw new Error("Thread not found");
-    }
-    return thread;
-  },
-});
+// getThreadInternal has been moved to getThreadInternal.ts

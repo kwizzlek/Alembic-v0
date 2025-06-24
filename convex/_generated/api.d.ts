@@ -8,12 +8,18 @@
  * @module
  */
 
+import type * as getThreadInternal from "../getThreadInternal.js";
+import type * as index from "../index.js";
+import type * as migrations_add_createdAt_to_messages from "../migrations/add_createdAt_to_messages.js";
+import type * as migrations_fix_user_schema from "../migrations/fix_user_schema.js";
+import type * as threads from "../threads.js";
+import type * as workflow from "../workflow.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
-import type * as index from "../index.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -24,13 +30,22 @@ import type * as index from "../index.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  getThreadInternal: typeof getThreadInternal;
   index: typeof index;
+  "migrations/add_createdAt_to_messages": typeof migrations_add_createdAt_to_messages;
+  "migrations/fix_user_schema": typeof migrations_fix_user_schema;
+  threads: typeof threads;
+  workflow: typeof workflow;
 }>;
+declare const fullApiWithMounts: typeof fullApi;
+
 export declare const api: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "public">
 >;
 export declare const internal: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {};

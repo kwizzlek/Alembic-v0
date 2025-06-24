@@ -8,7 +8,11 @@ export default defineSchema({
 
   users: defineTable({
     name: v.string(),
-  }).index("by_name", ["name"]),
+    createdAt: v.optional(v.number()),
+    lastActiveAt: v.optional(v.number()),
+  })
+    .index("by_name", ["name"])
+    .index("by_last_active", ["lastActiveAt"]),
 
   threads: defineTable({
     channelId: v.id("channels"),
@@ -20,11 +24,13 @@ export default defineSchema({
     .index("by_updated", ["updatedAt"]),
 
   messages: defineTable({
-    threadId: v.id("threads"),
+    // Make threadId optional to handle existing messages without it
+    threadId: v.optional(v.id("threads")),
     channelId: v.id("channels"),
     authorId: v.optional(v.id("users")),
     content: v.string(),
-    createdAt: v.number(),
+    // createdAt is optional in the schema but will always be set by the application
+    createdAt: v.optional(v.number()),
   })
     .index("by_thread", ["threadId"])
     .index("by_channel", ["channelId"]),

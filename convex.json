@@ -1,0 +1,6 @@
+{
+  "projectId": "alembic-new",
+  "projectName": "Alembic New",
+  "deployment": "http://localhost:3210",
+  "migrations": "./convex/migrations"
+}
