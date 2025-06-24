@@ -92,39 +92,20 @@ export const createOrganization = async (name: string): Promise<{
   const supabase = createClient();
   
   try {
-    // Start a transaction
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return { data: null, error: new Error('User not authenticated') };
-    }
-    
-    // Create the tenant/organization
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .insert([{ name }])
-      .select('id, name, created_at')
-      .single();
-      
-    if (tenantError) throw tenantError;
-    
-    // Add the creating user as an admin
-    const { error: memberError } = await supabase
-      .from('tenant_members')
-      .insert([{
-        tenant_id: tenant.id,
-        user_id: user.id,
-        role: 'admin'
-      }]);
-      
-    if (memberError) throw memberError;
+    // Call the database function that handles organization creation and member assignment
+    const { data, error } = await supabase
+      .rpc('create_organization_with_owner', {
+        org_name: name
+      });
+
+    if (error) throw error;
     
     return { 
       data: {
-        id: tenant.id,
-        name: tenant.name,
+        id: data.id,
+        name: data.name,
         role: 'admin',
-        created_at: tenant.created_at
+        created_at: data.created_at
       }, 
       error: null 
     };
