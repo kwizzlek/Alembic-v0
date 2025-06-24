@@ -3,6 +3,65 @@
 ## Overview
 This document describes the database schema, security policies, and access patterns for the Alembic application. The application uses Supabase as the backend database with a multi-tenant architecture.
 
+## Database Migrations
+
+Database schema changes are managed through SQL migration files in the `supabase/migrations` directory. Each migration file is prefixed with a timestamp to ensure they are applied in the correct order.
+
+### Creating a New Migration
+
+1. Create a new SQL file in `supabase/migrations` with the following naming convention:
+   ```
+   YYYYMMDDHHMMSS_descriptive_name.sql
+   ```
+
+2. Write your SQL statements in the file. Make sure they are idempotent (can be run multiple times without issues).
+
+3. Test the migration in your development environment before applying to production.
+
+### Applying Migrations
+
+#### Local Development
+1. Open the Supabase dashboard
+2. Go to SQL Editor
+3. Copy the contents of the migration file
+4. Run the SQL in the editor
+
+#### Production
+1. Use the Supabase CLI to apply migrations:
+   ```bash
+   supabase db push
+   ```
+
+### Best Practices
+
+- Always test migrations in a development environment first
+- Never modify migration files after they've been applied to production
+- Each migration should be idempotent (can be run multiple times without issues)
+- Include comments explaining complex operations
+- Consider data migration steps separately from schema changes
+
+## Supabase Configuration
+
+### Environment Variables
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### Authentication
+Supabase Auth is used for user authentication. The following tables are provided by Supabase:
+
+#### auth.users
+Stores user authentication information (managed by Supabase).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| email | TEXT | User's email address |
+| email_confirmed_at | TIMESTAMPTZ | When email was confirmed |
+| created_at | TIMESTAMPTZ | When the user was created |
+| updated_at | TIMESTAMPTZ | When the user was last updated |
+
 ## Schema
 
 ### Tenants Table
@@ -53,6 +112,8 @@ Stores metadata for uploaded files with multi-tenant support.
 | created_at | TIMESTAMPTZ | When the document was uploaded |
 | updated_at | TIMESTAMPTZ | When the document was last updated |
 
+## Storage
+
 ### Storage Bucket: documents
 Stores the actual file content with secure, tenant-isolated access.
 
@@ -61,6 +122,11 @@ Stores the actual file content with secure, tenant-isolated access.
 | Name | documents | Bucket identifier |
 | Public | false | Access controlled by RLS policies |
 | File Structure | `{tenant_id}/{filename}` | Tenant-isolated file paths |
+
+#### Storage Policies
+- Users can only access files within their tenant's directory
+- File uploads are restricted to the user's tenant directory
+- File deletions are restricted to file owners and tenant admins
 
 ## Indexes
 
@@ -99,242 +165,28 @@ ALTER TABLE public.tenant_members ADD CONSTRAINT unique_tenant_member
    - Users can update/delete documents they uploaded
    - Tenant admins can update/delete any document in their tenant
 
-### Storage Security
-
-1. **Documents Bucket**
-   - Private bucket with RLS enabled
-   - Files stored in tenant-specific paths
-   - Access controlled by tenant membership
-
-2. **Access Rules**
-   - Users can only access files within their tenant's folder
-   - File paths must start with the user's tenant ID
-   - All operations are audited in the documents table
-
-### Helper Functions
-
-```sql
--- Check if a user is a member of a tenant
-CREATE OR REPLACE FUNCTION public.is_tenant_member(tenant_id UUID, user_id UUID)
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.tenant_members
-    WHERE tenant_members.tenant_id = $1
-    AND tenant_members.user_id = $2
-  );
-$$ LANGUAGE SQL SECURITY DEFINER;
-
--- Check if a user is an owner of a tenant
-CREATE OR REPLACE FUNCTION public.is_tenant_owner(tenant_id UUID, user_id UUID)
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.tenant_members
-    WHERE tenant_members.tenant_id = $1
-    AND tenant_members.user_id = $2
-    AND tenant_members.role = 'owner'
-  );
-$$ LANGUAGE SQL SECURITY DEFINER;
-
--- Update document's updated_at timestamp
-CREATE OR REPLACE FUNCTION public.update_modified_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-## Indexes
-
-```sql
--- Tenant members lookups
-CREATE INDEX idx_tenant_members_tenant_id ON public.tenant_members(tenant_id);
-CREATE INDEX idx_tenant_members_user_id ON public.tenant_members(user_id);
-
--- Ensure unique membership per tenant
-ALTER TABLE public.tenant_members ADD CONSTRAINT unique_tenant_member 
-  UNIQUE (tenant_id, user_id);
-```
-
-## Security
-
-### Row Level Security (RLS)
-
-1. **Tenants Table**
-   - Users can view tenants they are members of
-   - Only organization owners can update tenant information
-
-2. **Tenant Members Table**
-   - Users can see members of organizations they belong to
-   - Users can view their own memberships
-   - Only organization owners can add/remove members
-
-### Helper Functions
-
-```sql
--- Check if a user is a member of a tenant
-CREATE OR REPLACE FUNCTION public.is_tenant_member(tenant_id UUID, user_id UUID)
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.tenant_members
-    WHERE tenant_members.tenant_id = $1
-    AND tenant_members.user_id = $2
-  );
-$$ LANGUAGE SQL SECURITY DEFINER;
-
--- Check if a user is an owner of a tenant
-CREATE OR REPLACE FUNCTION public.is_tenant_owner(tenant_id UUID, user_id UUID)
-RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.tenant_members
-    WHERE tenant_members.tenant_id = $1
-    AND tenant_members.user_id = $2
-    AND tenant_members.role = 'owner'
-  );
-$$ LANGUAGE SQL SECURITY DEFINER;
-```
-
 ## API Endpoints
 
-### Create Organization
-```
-POST /api/orgs
-{
-  "name": "Organization Name"
-}
-```
+### Authentication
+- `POST /api/auth/signup` - Register a new user
+- `POST /api/auth/signin` - Sign in a user
+- `POST /api/auth/signout` - Sign out the current user
+- `GET /api/auth/session` - Get the current session
 
-### Update Organization
-```
-PATCH /api/orgs/:id
-{
-  "name": "New Organization Name"
-}
-```
-
-### Delete Organization
-```
-DELETE /api/orgs/:id
-```
-
-## Best Practices
-
-1. **Data Access**
-   - Always use the helper functions for permission checks
-   - Use the organization context to get the current organization
-   - Validate user permissions before performing sensitive operations
-
-2. **Security**
-   - Never expose sensitive data in API responses
-   - Always validate input data
-   - Use RLS as the primary security mechanism
-
-3. **Performance**
-   - Ensure proper indexes are in place for common query patterns
-   - Monitor query performance using Supabase's query analysis tools
-   - Consider denormalizing data for frequently accessed information
-
-## Changelog
-
-### 2024-06-21
-- Removed subdomain functionality
-- Simplified organization management
-- Added proper RLS policies
-- Updated documentation to reflect current schema
-|--------|------|-------------|
-| id | UUID | Primary key |
-| tenant_id | UUID | References tenants.id |
-| name | TEXT | Workflow name |
-| status | TEXT | Workflow status (draft, pending, approved, rejected) |
-| definition | JSONB | Workflow definition |
-| created_by | UUID | References profiles.id (creator) |
-| created_at | TIMESTAMPTZ | When the workflow was created |
-| updated_at | TIMESTAMPTZ | When the workflow was last updated |
-
-## Row Level Security (RLS) Policies
-
-### Tenants
-- **View**: All authenticated users can view all tenants
-- **Create**: Authenticated users can create new tenants
-
-### Profiles
-- **View**: Users can view their own profile or if they have service role
-- **Create**: Automatic profile creation via trigger when new user signs up
+### Organizations
+- `GET /api/organizations` - List organizations for current user
+- `POST /api/organizations` - Create a new organization
+- `GET /api/organizations/[id]` - Get organization details
+- `PUT /api/organizations/[id]` - Update organization
+- `DELETE /api/organizations/[id]` - Delete organization
+- `GET /api/organizations/[id]/members` - List organization members
+- `POST /api/organizations/[id]/invite` - Invite member to organization
+- `DELETE /api/organizations/[id]/members/[userId]` - Remove member from organization
 
 ### Documents
-- **View**: Users can view documents from their tenant
-- **Create**: Users can create documents for their tenant
-- **Update/Delete**: Currently restricted (add specific policies as needed)
-
-### Workflows
-- **View**: Users can view workflows from their tenant
-- **Create**: Users can create workflows for their tenant
-- **Update/Delete**: Currently restricted (add specific policies as needed)
-
-## Triggers
-
-1. **update_modified_column**
-   - Updates the `updated_at` timestamp on any table update
-   - Applies to: tenants, profiles, documents, workflows
-
-2. **handle_new_user**
-   - Creates a profile when a new user signs up via Supabase Auth
-   - Sets default role to 'user'
-
-## Indexes
-
-- `idx_profiles_tenant_id` - Speeds up tenant-based queries on profiles
-- `idx_documents_tenant_id` - Speeds up tenant-based queries on documents
-- `idx_documents_user_id` - Speeds up user-based document queries
-- `idx_workflows_tenant_id` - Speeds up tenant-based workflow queries
-- `idx_workflows_created_by` - Speeds up creator-based workflow queries
-
-## Best Practices
-
-1. **Multi-tenancy**: Always include `tenant_id` in queries to ensure data isolation
-2. **RLS**: All tables have RLS enabled - ensure proper policies are in place
-3. **Timestamps**: Use `created_at` and `updated_at` for auditing
-4. **Soft Deletes**: Consider adding `deleted_at` for soft delete functionality
-
-## Example Queries
-
-### Get all documents for current user's tenant
-```sql
-SELECT * FROM public.documents 
-WHERE tenant_id = (
-  SELECT tenant_id FROM public.profiles WHERE id = auth.uid()
-);
-```
-
-### Get all workflows created by current user
-```sql
-SELECT * FROM public.workflows 
-WHERE created_by = auth.uid()
-AND tenant_id = (
-  SELECT tenant_id FROM public.profiles WHERE id = auth.uid()
-);
-```
-
-### Get user's tenant information
-```sql
-SELECT t.* FROM public.tenants t
-JOIN public.profiles p ON p.tenant_id = t.id
-WHERE p.id = auth.uid();
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **RLS Violations**
-   - Ensure the user is authenticated
-   - Verify the user has the correct tenant association
-   - Check the JWT claims for the correct user ID and role
-
-2. **Missing Permissions**
-   - Verify the authenticated role has necessary permissions
-   - Check if the user is associated with a tenant
-
-3. **Performance Issues**
-   - Ensure proper indexes are in place for common query patterns
-   - Monitor query performance using Supabase's query analysis tools
+- `GET /api/documents` - List documents for current tenant
+- `POST /api/documents` - Upload a new document
+- `GET /api/documents/[id]` - Get document details
+- `PUT /api/documents/[id]` - Update document metadata
+- `DELETE /api/documents/[id]` - Delete a document
+- `GET /api/documents/[id]/download` - Download document content

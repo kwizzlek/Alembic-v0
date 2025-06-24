@@ -1,0 +1,38 @@
+# Supabase Configuration
+
+[api]
+# The port to use for the local Supabase API
+port = 54321
+
+[db]
+# The port to use for the local PostgreSQL database
+port = 54322
+# The database name
+db_name = "postgres"
+# The database password
+password = "postgres"
+
+[studio]
+# The port to use for the Supabase Studio UI
+port = 3000
+# Enable or disable the Studio UI
+enabled = true
+
+[inbucket]
+# The port to use for the email testing interface
+port = 54324
+
+[storage]
+# The port to use for the local storage API
+port = 54321
+
+[realtime]
+# The port to use for the Realtime API
+port = 4000
+
+# Extensions to enable in the database
+[extensions]
+# Enable the pgvector extension for vector similarity search
+vector = "latest"
+# Enable the pg_graphql extension for GraphQL support
+graphql = "latest"

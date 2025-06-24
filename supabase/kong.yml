@@ -1,0 +1,92 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  - name: api
+    url: http://rest:3000
+    routes:
+      - name: rest
+        paths:
+          - /rest/v1/
+    plugins:
+      - name: key-auth
+        config:
+          key_in_header: true
+          key_in_query: true
+          key_in_body: false
+          hide_credentials: false
+          anonymous: ""
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+            - PATCH
+          headers:
+            - "*"
+          exposed_headers:
+            - "*"
+          credentials: true
+          max_age: 3600
+
+  - name: auth
+    url: http://auth:9999
+    routes:
+      - name: auth
+        paths:
+          - /auth/v1/
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+            - PATCH
+          headers:
+            - "*"
+          exposed_headers:
+            - "*"
+          credentials: true
+          max_age: 3600
+
+  - name: storage
+    url: http://storage:5000
+    routes:
+      - name: storage
+        paths:
+          - /storage/v1/
+    plugins:
+      - name: key-auth
+        config:
+          key_in_header: true
+          key_in_query: true
+          key_in_body: false
+          hide_credentials: false
+          anonymous: ""
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+            - PATCH
+          headers:
+            - "*"
+          exposed_headers:
+            - "*"
+          credentials: true
+          max_age: 3600
