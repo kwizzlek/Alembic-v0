@@ -33,38 +33,56 @@ type TenantMember = {
   };
 };
 
-export const getOrganizations = async (): Promise<{
+export const getOrganizations = async (organizationId?: string): Promise<{
   data: Organization[];
   error: Error | null;
 }> => {
   const supabase = createClient();
   
-  const { data, error } = await supabase
-    .from('tenant_members')
-    .select(`
-      role,
-      created_at,
-      tenant:tenant_id (id, name, created_at)
-    `)
-    .not('tenant_id', 'is', null);
+  try {
+    let query = supabase
+      .from('tenant_members')
+      .select(`
+        role,
+        created_at,
+        tenant:tenant_id (id, name, created_at)
+      `)
+      .not('tenant_id', 'is', null);
 
-  if (error) {
-    return { data: [], error };
+    // If an organization ID is provided, filter by that ID
+    if (organizationId) {
+      query = query.eq('tenant_id', organizationId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching organizations:', error);
+      return { data: [], error };
+    }
+
+    if (!data || data.length === 0) {
+      const errorMsg = organizationId 
+        ? `No organization found with ID: ${organizationId}` 
+        : 'No organizations found';
+      return { data: [], error: new Error(errorMsg) };
+    }
+
+    const formattedData = data.map((item: any) => ({
+      id: item.tenant?.id || '',
+      name: item.tenant?.name || 'Unnamed Organization',
+      role: item.role || 'member',
+      created_at: item.tenant?.created_at || new Date().toISOString(),
+    }));
+
+    return { data: formattedData, error: null };
+  } catch (error) {
+    console.error('Unexpected error in getOrganizations:', error);
+    return { 
+      data: [], 
+      error: error instanceof Error ? error : new Error('An unexpected error occurred') 
+    };
   }
-
-  if (!data) {
-    return { data: [], error: new Error('No data returned') };
-  }
-
-
-  const formattedData = data.map((item: any) => ({
-    id: item.tenant?.id || '',
-    name: item.tenant?.name || 'Unnamed Organization',
-    role: item.role || 'member',
-    created_at: item.tenant?.created_at || new Date().toISOString(),
-  }));
-
-  return { data: formattedData, error: null };
 };
 
 export const createOrganization = async (name: string): Promise<{
@@ -172,23 +190,23 @@ export const getOrganizationMembers = async (organizationId: string): Promise<{
       return { data: [], error: null };
     }
     
-    // Get user details for all member IDs
-    const userIds = membersData.map(member => member.user_id);
-    const { data: usersData, error: usersError } = await supabase
-      .from('users')
-      .select('id, email, user_metadata')
-      .in('id', userIds);
+    // Get user details from profiles table
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, email')
+      .in('id', membersData.map(m => m.user_id));
       
-    if (usersError) throw usersError;
+    if (profilesError) throw profilesError;
     
     // Combine the data
     const members = membersData.map(member => {
-      const user = usersData?.find(u => u.id === member.user_id);
+      const profile = profiles?.find(p => p.id === member.user_id);
+      
       return {
         id: member.user_id,
-        email: user?.email || 'Unknown',
-        full_name: user?.user_metadata?.full_name || null,
-        avatar_url: user?.user_metadata?.avatar_url || null,
+        email: profile?.email || 'Unknown',
+        full_name: profile?.full_name || null,
+        avatar_url: profile?.avatar_url || null,
         role: member.role,
         created_at: member.created_at
       };

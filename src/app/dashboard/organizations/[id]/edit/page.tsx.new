@@ -1,0 +1,42 @@
+import { notFound } from 'next/navigation';
+import { getOrganizations, getOrganizationMembers } from '@/lib/api/organizations';
+import EditOrganizationForm from './edit-organization-form';
+
+interface PageProps {
+  params: { id: string };
+}
+
+export default async function EditOrganizationPage({ params }: PageProps) {
+  const { id } = params;
+  
+  // Fetch the list of organizations the user has access to
+  const { data: organizations, error: orgsError } = await getOrganizations();
+  
+  if (orgsError || !organizations) {
+    console.error('Error loading organizations:', orgsError);
+    notFound();
+  }
+  
+  // Find the current organization
+  const organization = organizations.find(org => org.id === id);
+  
+  if (!organization) {
+    notFound();
+  }
+  
+  // Fetch organization members
+  const { data: members = [], error: membersError } = await getOrganizationMembers(id);
+  
+  if (membersError) {
+    console.error('Error loading members:', membersError);
+    // Continue rendering the page even if members fail to load
+  }
+  
+  // Prepare initial data for the form
+  const initialData = {
+    name: organization.name,
+    members
+  };
+  
+  return <EditOrganizationForm organizationId={id} initialData={initialData} />;
+}

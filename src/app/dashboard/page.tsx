@@ -106,16 +106,16 @@ export default function DashboardPage() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {organizations.slice(0, 3).map((org) => (
-                  <Link key={org.id} href={`/dashboard/organizations/${org.id}`} className="block">
-                    <Card className="hover:shadow-md transition-shadow h-full">
-                      <CardHeader>
-                        <CardTitle className="text-lg">{org.name}</CardTitle>
-                        <CardDescription>
-                          <Badge variant="outline" className="capitalize">
-                            {org.role}
-                          </Badge>
-                        </CardDescription>
-                      </CardHeader>
+                  <Card key={org.id} className="hover:shadow-md transition-shadow h-full flex flex-col">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{org.name}</CardTitle>
+                      <CardDescription>
+                        <Badge variant="outline" className="capitalize">
+                          {org.role}
+                        </Badge>
+                      </CardDescription>
+                    </CardHeader>
+                    <div className="mt-auto">
                       <CardFooter>
                         <Button variant="outline" className="w-full" asChild>
                           <Link href={`/dashboard/organizations/${org.id}`}>
@@ -123,8 +123,8 @@ export default function DashboardPage() {
                           </Link>
                         </Button>
                       </CardFooter>
-                    </Card>
-                  </Link>
+                    </div>
+                  </Card>
                 ))}
                 {organizations.length > 3 && (
                   <Card className="flex items-center justify-center hover:shadow-md transition-colors">
