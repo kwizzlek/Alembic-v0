@@ -139,7 +139,7 @@ export function DashboardNav() {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/dashboard" className="w-full cursor-pointer">
+              <Link href="/dashboard/organizations" className="w-full cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Manage Organizations</span>
               </Link>
