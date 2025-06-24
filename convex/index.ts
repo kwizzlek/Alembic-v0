@@ -8,6 +8,7 @@ import {
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import OpenAI from "openai";
+import { Id } from "./_generated/dataModel";
 
 // Test endpoint to check environment variables
 export const testEnvVars = internalAction({
@@ -60,26 +61,127 @@ export const getOrCreateUser = mutation({
 });
 
 /**
- * List messages for a channel.
+ * List all threads in a channel
  */
-export const listMessages = query({
+export const listThreads = query({
   args: {
     channelId: v.id("channels"),
   },
   returns: v.array(
     v.object({
+      _id: v.id("threads"),
+      title: v.string(),
+      updatedAt: v.number(),
+      messageCount: v.number(),
+      preview: v.optional(v.string()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const threads = await ctx.db
+      .query("threads")
+      .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
+      .order("desc")
+      .collect();
+
+    return Promise.all(
+      threads.map(async (thread) => {
+        // Get the most recent message for preview
+        const messages = await ctx.db
+          .query("messages")
+          .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+          .order("desc")
+          .collect();
+        const recentMessage = messages[0];
+
+        // Get message count
+        const messageCount = messages.length;
+
+        return {
+          ...thread,
+          messageCount,
+          preview: recentMessage ? 
+            (recentMessage.content.length > 100 
+              ? recentMessage.content.substring(0, 100) + '...' 
+              : recentMessage.content)
+            : 'New thread',
+        };
+      })
+    );
+  },
+});
+
+/**
+ * Create a new thread
+ */
+export const createThread = mutation({
+  args: {
+    channelId: v.id("channels"),
+    title: v.string(),
+  },
+  returns: v.id("threads"),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const threadId = await ctx.db.insert("threads", {
+      channelId: args.channelId,
+      title: args.title,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return threadId;
+  },
+});
+
+/**
+ * Get thread details
+ */
+export const getThreadDetails = query({
+  args: {
+    threadId: v.id("threads"),
+  },
+  returns: v.object({
+    _id: v.id("threads"),
+    title: v.string(),
+    channelId: v.id("channels"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
+    }
+    return thread;
+  },
+});
+
+/**
+ * List messages in a thread
+ */
+export const listMessages = query({
+  args: {
+    threadId: v.id("threads"),
+  },
+  returns: v.array(
+    v.object({
       _id: v.id("messages"),
       _creationTime: v.number(),
+      threadId: v.id("threads"),
       channelId: v.id("channels"),
       authorId: v.optional(v.id("users")),
       authorName: v.optional(v.string()),
       content: v.string(),
+      createdAt: v.number(),
     })
   ),
   handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
+    }
+
     const messages = await ctx.db
       .query("messages")
-      .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .order("asc") // Fetch oldest messages first
       .collect();
 
@@ -102,31 +204,44 @@ export const listMessages = query({
 });
 
 /**
- * Send a message to a channel and schedule a response from the AI.
+ * Send a message to a thread and schedule a response from the AI.
  */
 export const sendMessage = mutation({
   args: {
-    channelId: v.id("channels"),
+    threadId: v.id("threads"),
     authorId: v.id("users"),
     content: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const channel = await ctx.db.get(args.channelId);
-    if (!channel) {
-      throw new Error("Channel not found");
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
     }
     const user = await ctx.db.get(args.authorId);
     if (!user) {
       throw new Error("User not found");
     }
+    
+    const now = Date.now();
+    
+    // Update thread's updatedAt timestamp
+    await ctx.db.patch(thread._id, {
+      updatedAt: now,
+    });
+
+    // Add the message
     await ctx.db.insert("messages", {
-      channelId: args.channelId,
+      threadId: args.threadId,
+      channelId: thread.channelId,
       authorId: args.authorId,
       content: args.content,
+      createdAt: now,
     });
+
+    // Schedule AI response
     await ctx.scheduler.runAfter(0, internal.index.generateResponse, {
-      channelId: args.channelId,
+      threadId: args.threadId,
     });
     return null;
   },
@@ -134,7 +249,7 @@ export const sendMessage = mutation({
 
 export const generateResponse = internalAction({
   args: {
-    channelId: v.id("channels"),
+    threadId: v.id("threads"),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -161,8 +276,12 @@ export const generateResponse = internalAction({
       });
 
       console.log("Loading conversation context...");
+      const thread = await ctx.runQuery(internal.index.getThreadInternal, {
+        threadId: args.threadId,
+      });
+      
       const context = await ctx.runQuery(internal.index.loadContext, {
-        channelId: args.channelId,
+        threadId: args.threadId,
       });
       console.log("Context loaded, making API call...");
 
@@ -185,7 +304,8 @@ export const generateResponse = internalAction({
 
       console.log("Writing agent response to database...");
       await ctx.runMutation(internal.index.writeAgentResponse, {
-        channelId: args.channelId,
+        threadId: args.threadId,
+        channelId: thread.channelId,
         content,
       });
       
@@ -200,7 +320,7 @@ export const generateResponse = internalAction({
 
 export const loadContext = internalQuery({
   args: {
-    channelId: v.id("channels"),
+    threadId: v.id("threads"),
   },
   returns: v.array(
     v.object({
@@ -209,15 +329,16 @@ export const loadContext = internalQuery({
     })
   ),
   handler: async (ctx, args) => {
-    const channel = await ctx.db.get(args.channelId);
-    if (!channel) {
-      throw new Error("Channel not found");
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
     }
+    
     const messages = await ctx.db
       .query("messages")
-      .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
-      .order("desc")
-      .take(10);
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("asc") // Get messages in chronological order
+      .collect();
 
     const result = [];
     for (const message of messages) {
@@ -234,22 +355,54 @@ export const loadContext = internalQuery({
         result.push({ role: "assistant" as const, content: message.content });
       }
     }
-    // The API expects messages in chronological order.
-    return result.reverse();
+    
+    return result;
   },
 });
 
 export const writeAgentResponse = internalMutation({
   args: {
+    threadId: v.id("threads"),
     channelId: v.id("channels"),
     content: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const now = Date.now();
+    
+    // Update thread's updatedAt timestamp
+    await ctx.db.patch(args.threadId, {
+      updatedAt: now,
+    });
+    
+    // Add the AI response message
     await ctx.db.insert("messages", {
+      threadId: args.threadId,
       channelId: args.channelId,
       content: args.content,
+      createdAt: now,
     });
+    
     return null;
+  },
+});
+
+export const getThreadInternal = internalQuery({
+  args: {
+    threadId: v.id("threads"),
+  },
+  returns: v.object({
+    _id: v.id("threads"),
+    channelId: v.id("channels"),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread) {
+      throw new Error("Thread not found");
+    }
+    return thread;
   },
 });

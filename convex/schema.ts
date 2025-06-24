@@ -10,9 +10,22 @@ export default defineSchema({
     name: v.string(),
   }).index("by_name", ["name"]),
 
+  threads: defineTable({
+    channelId: v.id("channels"),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel", ["channelId"])
+    .index("by_updated", ["updatedAt"]),
+
   messages: defineTable({
+    threadId: v.id("threads"),
     channelId: v.id("channels"),
     authorId: v.optional(v.id("users")),
     content: v.string(),
-  }).index("by_channel", ["channelId"]),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId"])
+    .index("by_channel", ["channelId"]),
 });
