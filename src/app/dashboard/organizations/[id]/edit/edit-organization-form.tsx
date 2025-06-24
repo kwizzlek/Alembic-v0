@@ -197,15 +197,7 @@ export default function EditOrganizationForm({ organizationId, initialData }: Ed
               />
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={isDeleting}
-            >
-              {isDeleting ? 'Deleting...' : 'Delete Organization'}
-            </Button>
+          <CardFooter className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -303,6 +295,35 @@ export default function EditOrganizationForm({ organizationId, initialData }: Ed
                 )}
               </TableBody>
             </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          <CardDescription>
+            These actions are irreversible. Please be certain.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-destructive/50 p-4">
+              <div>
+                <h4 className="font-medium">Delete this organization</h4>
+                <p className="text-sm text-muted-foreground">
+                  Once you delete an organization, there is no going back. Please be certain.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Organization'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

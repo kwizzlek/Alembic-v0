@@ -171,6 +171,20 @@ export const updateOrganization = async (id: string, updates: { name: string }):
   }
 };
 
+type MemberWithProfile = {
+  user_id: string;
+  role: string;
+  created_at: string;
+  profiles: {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    auth_users: {
+      email: string;
+    }[];
+  }[];
+};
+
 export const getOrganizationMembers = async (organizationId: string): Promise<{
   data: OrganizationMember[];
   error: Error | null;
@@ -178,33 +192,88 @@ export const getOrganizationMembers = async (organizationId: string): Promise<{
   const supabase = createClient();
   
   try {
-    // First, get all member user IDs for this organization
-    const { data: membersData, error: membersError } = await supabase
+    console.log('Fetching members for organization:', organizationId);
+    
+    // First, verify the organization exists
+    const { data: orgData, error: orgError } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('id', organizationId)
+      .single();
+      
+    if (orgError || !orgData) {
+      console.error('Organization not found:', organizationId, orgError);
+      return { data: [], error: new Error('Organization not found') };
+    }
+    
+    // First, log the SQL for the organization verification
+    console.log('Verifying organization with ID:', organizationId);
+    
+    // Get members with their profile information
+    console.log('Executing query to get members for organization:', organizationId);
+    
+    // The actual query we need to run according to the schema:
+    // 1. Join tenant_members with profiles on user_id
+    // 2. Get the user's email from auth.users
+    const sql = `
+      SELECT 
+        tm.user_id,
+        tm.role,
+        tm.created_at,
+        p.id,
+        u.email,
+        p.full_name,
+        p.avatar_url
+      FROM tenant_members tm
+      JOIN profiles p ON tm.user_id = p.id
+      JOIN auth.users u ON p.id = u.id
+      WHERE tm.tenant_id = '${organizationId}'
+    `;
+    
+    console.log('Equivalent SQL Query:');
+    console.log(sql);
+    
+    // Execute the query using Supabase's query builder
+    const { data, error, status, statusText } = await supabase
       .from('tenant_members')
-      .select('user_id, role, created_at')
+      .select(`
+        user_id,
+        role,
+        created_at,
+        profiles!inner(
+          id,
+          full_name,
+          avatar_url,
+          auth_users:user_id (
+            email
+          )
+        )
+      `)
       .eq('tenant_id', organizationId);
       
-    if (membersError) throw membersError;
+    console.log('Members query result:', { data, error, status, statusText });
     
-    if (!membersData || membersData.length === 0) {
+    if (error) {
+      console.error('Error in members query:', error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('No members found for organization:', organizationId);
       return { data: [], error: null };
     }
     
-    // Get user details from profiles table
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url, email')
-      .in('id', membersData.map(m => m.user_id));
-      
-    if (profilesError) throw profilesError;
-    
-    // Combine the data
-    const members = membersData.map(member => {
-      const profile = profiles?.find(p => p.id === member.user_id);
+    // Transform the data to match the OrganizationMember type
+    const members = data.map(member => {
+      // Log each member to help with debugging
+      console.log('Processing member:', member);
+      // Since we used an inner join, there should be exactly one profile per member
+      const profile = member.profiles?.[0];
+      const email = profile?.auth_users?.[0]?.email || '';
       
       return {
         id: member.user_id,
-        email: profile?.email || 'Unknown',
+        email: email,
         full_name: profile?.full_name || null,
         avatar_url: profile?.avatar_url || null,
         role: member.role,
@@ -212,6 +281,7 @@ export const getOrganizationMembers = async (organizationId: string): Promise<{
       };
     });
     
+    console.log('Processed members:', members);
     return { data: members, error: null };
   } catch (error) {
     console.error('Error fetching organization members:', error);
