@@ -10,6 +10,7 @@ import { useAuth } from '@/components/auth-provider';
 import { getOrganizations } from '@/lib/api/organizations';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import AIAssistant from '@/components/AIAssistant';
 
 type UserProfile = {
   id: string;
@@ -142,6 +143,10 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
+          </div>
+
+          <div className="mt-8">
+            <AIAssistant />
           </div>
         </div>
       </main>

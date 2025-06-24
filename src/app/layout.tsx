@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { getSupabaseServerClient, getSession } from '@/lib/supabase/server';
+import ConvexClientProvider from '@/components/ConvexClientProvider';
 import type { Session } from '@supabase/supabase-js';
 import type { ReactNode } from 'react';
 
@@ -44,10 +45,12 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           disableTransitionOnChange
         >
           <AuthProvider initialSession={session}>
-            <div className="min-h-screen bg-background text-foreground">
-              {children}
-              <Toaster position="top-center" />
-            </div>
+            <ConvexClientProvider>
+              <div className="min-h-screen bg-background text-foreground">
+                {children}
+                <Toaster position="top-center" />
+              </div>
+            </ConvexClientProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
