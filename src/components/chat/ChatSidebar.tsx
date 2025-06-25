@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -30,15 +30,14 @@ type Thread = {
 export function ChatSidebar({
   onSelectThread,
   selectedThreadId,
+  threads,
 }: {
   onSelectThread: (threadId: string) => void;
   selectedThreadId: string | null;
+  threads: Thread[];
 }) {
   const { toast } = useToast();
   const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
-  
-  // Fetch threads
-  const threads = useQuery(api.threads.listThreads, {});
   
   // Mutations
   const createThread = useMutation(api.threads.createThread);
@@ -87,7 +86,7 @@ export function ChatSidebar({
     }
   };
 
-  if (threads === undefined) {
+  if (!threads) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="h-6 w-6 animate-spin" />

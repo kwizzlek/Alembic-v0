@@ -5,7 +5,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { getSupabaseServerClient, getSession } from '@/lib/supabase/server';
-import ConvexClientProvider from '@/components/ConvexClientProvider';
+import ConvexClientProvider from '@/components/providers/ConvexClientProvider';
 import type { Session } from '@supabase/supabase-js';
 import type { ReactNode } from 'react';
 
@@ -28,31 +28,30 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   
   try {
     const supabase = await getSupabaseServerClient();
-    // Use our updated getSession which verifies the user
     const { data } = await getSession();
     session = data.session;
   } catch (error) {
-    console.error('Error getting session:', error);
+    console.error("Error getting session:", error);
   }
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased bg-background text-foreground`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
+        <ConvexClientProvider>
           <AuthProvider initialSession={session}>
-            <ConvexClientProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
               <div className="min-h-screen">
                 {children}
                 <Toaster position="top-center" />
               </div>
-            </ConvexClientProvider>
+            </ThemeProvider>
           </AuthProvider>
-        </ThemeProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );

@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { FileText } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
+import type { Doc } from '../../../convex/_generated/dataModel';
 import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { DocumentLibrary } from './DocumentLibrary';
 import { Loader2 } from 'lucide-react';
 
 type Message = {
@@ -116,17 +120,29 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
 
   // State
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const ensureDefaultChannel = useMutation(api.index.ensureDefaultChannel);
 
-  // Queries
-  const defaultChannel = useQuery(api.index.getOrCreateDefaultChannel);
-  
-  // Set the channel ID once it's available
+  // Get or create the default channel
   useEffect(() => {
-    if (defaultChannel) {
-      setChannelId(defaultChannel._id);
-    }
-  }, [defaultChannel]);
+    const setupDefaultChannel = async () => {
+      try {
+        const channelId = await ensureDefaultChannel({});
+        if (channelId) {
+          setChannelId(channelId);
+        }
+      } catch (error) {
+        console.error('Error setting up default channel:', error);
+      }
+    };
+    
+    setupDefaultChannel();
+  }, [ensureDefaultChannel]);
   
+  // Add diagnostic logging
+  console.log('--- Convex Channel ID Debug ---');
+  console.log('channelId value:', channelId);
+  console.log('typeof channelId:', typeof channelId);
+
   // Fetch threads for the current channel
   const threadsResult = useQuery(
     api.index.listThreads,
@@ -198,6 +214,14 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
 
   // Handle sending a message
   const [isSending, setIsSending] = useState(false);
+  const [showDocumentLibrary, setShowDocumentLibrary] = useState(true);
+  
+  // Show toast when document library is toggled
+  useEffect(() => {
+    if (showDocumentLibrary) {
+      toast.success('Document library enabled. You can now upload and manage documents.');
+    }
+  }, [showDocumentLibrary]);
   
   const handleMessageSent = useCallback(async (content: string) => {
     if (!selectedThreadId) {
@@ -251,16 +275,37 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar */}
-      <div className="w-64 border-r">
-        <ChatSidebar
-          threads={threads}
-          selectedThreadId={selectedThreadId}
-          onSelectThreadAction={setSelectedThreadId}
-          onNewThreadAction={handleNewThread}
-          onDeleteThreadAction={handleDeleteThread}
-        />
+      {/* Left Sidebar - Threads */}
+      <div className="w-64 border-r flex flex-col">
+        <div className="flex-1 overflow-hidden">
+          <ChatSidebar
+            threads={threads}
+            selectedThreadId={selectedThreadId}
+            onSelectThreadAction={setSelectedThreadId}
+            onNewThreadAction={handleNewThread}
+            onDeleteThreadAction={handleDeleteThread}
+          />
+        </div>
+        
+        {/* Document Library Toggle */}
+        <div className="border-t p-2">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start"
+            onClick={() => setShowDocumentLibrary(!showDocumentLibrary)}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            {showDocumentLibrary ? 'Hide Documents' : 'Show Documents'}
+          </Button>
+        </div>
       </div>
+      
+      {/* Document Library Sidebar */}
+      {showDocumentLibrary && channelId && (
+        <div className="w-80 border-r">
+          <DocumentLibrary channelId={channelId} />
+        </div>
+      )}
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">

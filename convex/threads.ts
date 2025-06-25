@@ -1,44 +1,27 @@
-import { query, mutation } from "./_generated/server";
+// No need to import the original query/mutation if not used directly
+// import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+// This import is incorrect and should be removed.
+// import { isAuthenticated } from "./auth.config";
+import { queryWithAuth, mutationWithAuth } from "./utils";
 
 /**
- * List all threads for the current user
+ * Get a single thread by ID
  */
-export const listThreads = query({
-  args: {},
-  handler: async (ctx) => {
-    // In a real app, you might want to filter threads by the current user
-    const threads = await ctx.db.query("threads")
-      .withIndex("by_updated", q => q)
-      .order("desc")
-      .collect();
-
-    // Get the last message for each thread
-    const threadsWithLastMessage = await Promise.all(
-      threads.map(async (thread) => {
-        const lastMessage = await ctx.db
-          .query("messages")
-          .withIndex("by_thread", q => q.eq("threadId", thread._id))
-          .order("desc")
-          .first();
-        
-        return {
-          ...thread,
-          lastMessage: lastMessage?.content || "No messages yet",
-          lastMessageAt: lastMessage?.createdAt || thread.createdAt,
-        };
-      })
-    );
-
-    return threadsWithLastMessage;
+export const getThread = queryWithAuth({
+  args: {
+    threadId: v.id("threads"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.threadId);
   },
 });
 
 /**
  * Create a new thread
  */
-export const createThread = mutation({
+export const createThread = mutationWithAuth({
   args: {
     title: v.string(),
     channelId: v.id("channels"),
@@ -48,6 +31,8 @@ export const createThread = mutation({
     const threadId = await ctx.db.insert("threads", {
       title: args.title,
       channelId: args.channelId,
+      // You can now access the authenticated user's token identifier directly
+      createdBy: ctx.identity.tokenIdentifier, 
       createdAt: now,
       updatedAt: now,
     });
@@ -58,7 +43,7 @@ export const createThread = mutation({
 /**
  * Delete a thread and all its messages
  */
-export const deleteThread = mutation({
+export const deleteThread = mutationWithAuth({
   args: {
     threadId: v.id("threads"),
   },
@@ -81,21 +66,9 @@ export const deleteThread = mutation({
 });
 
 /**
- * Get a single thread by ID
- */
-export const getThread = query({
-  args: {
-    threadId: v.id("threads"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.threadId);
-  },
-});
-
-/**
  * List all messages in a thread
  */
-export const listMessages = query({
+export const listMessages = queryWithAuth({
   args: {
     threadId: v.id("threads"),
   },
