@@ -3,10 +3,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
-import { Loader2, MessageSquare } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ChatInterface } from '@/components/chat/ChatInterface';
+import { Loader2 } from 'lucide-react';
 
-export default function DashboardPage() {
+export default function BuilderPage() {
   const { user, session, loading } = useAuth();
   const router = useRouter();
 
@@ -29,19 +29,9 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-            <div className="bg-card p-6 rounded-lg shadow-sm border">
-              <h2 className="text-xl font-semibold mb-4">Welcome to Alembic</h2>
-              <p className="text-muted-foreground mb-6">
-                Get started by exploring the AI builder to create and manage your AI conversations.
-              </p>
-              <Button 
-                onClick={() => router.push('/builder')}
-                className="gap-2"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Go to AI Builder
-              </Button>
+            <h1 className="text-2xl font-bold mb-6">AI Chat</h1>
+            <div className="h-[calc(100vh-200px)]">
+              <ChatInterface userId={user.id} />
             </div>
           </div>
         </div>

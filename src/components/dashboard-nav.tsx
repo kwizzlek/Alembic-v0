@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, ChevronDown, Building2 } from 'lucide-react';
+import { LogOut, User, Settings, ChevronDown, Building2, MessageSquare } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { getOrganizations } from '@/lib/api/organizations';
 import { toast } from 'sonner';
@@ -101,6 +101,16 @@ export function DashboardNav() {
   return (
     <div className="flex items-center space-x-6">
       <nav className="flex items-center space-x-4" aria-label="Dashboard navigation">
+        <Button 
+          variant="ghost" 
+          asChild
+          className="hidden md:flex"
+        >
+          <Link href="/builder">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Builder
+          </Link>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-1 px-3">
