@@ -181,13 +181,20 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
 
   // Handle deleting a thread
   const handleDeleteThread = useCallback(async (threadId: Id<'threads'>) => {
-    if (!confirm('Are you sure you want to delete this chat?')) return;
     try {
       await deleteThreadMutation({ threadId });
+      // If the deleted thread was selected, clear the selection
+      if (selectedThreadId === threadId) {
+        setSelectedThreadId(null);
+      }
+      // If this was the last thread, ensure we clear the selection
+      if (threads.length === 1) {
+        setSelectedThreadId(null);
+      }
     } catch (error) {
       console.error('Error deleting thread:', error);
     }
-  }, [deleteThreadMutation]);
+  }, [deleteThreadMutation, selectedThreadId, threads.length]);
 
   // Handle sending a message
   const [isSending, setIsSending] = useState(false);
