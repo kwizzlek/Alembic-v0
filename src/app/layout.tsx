@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased`}>
+      <body className={`font-sans antialiased bg-background text-foreground`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         >
           <AuthProvider initialSession={session}>
             <ConvexClientProvider>
-              <div className="min-h-screen bg-background text-foreground">
+              <div className="min-h-screen">
                 {children}
                 <Toaster position="top-center" />
               </div>

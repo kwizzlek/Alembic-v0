@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Settings, ChevronDown, Building2 } from 'lucide-react';
+import { ThemeToggle } from './theme-toggle';
 import { getOrganizations } from '@/lib/api/organizations';
 import { toast } from 'sonner';
 
@@ -148,8 +149,11 @@ export function DashboardNav() {
         </DropdownMenu>
       </nav>
       
-      <div className="flex items-center border-l pl-4 ml-2">
-        <DropdownMenu>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <div className="h-8 w-px bg-border" />
+        <div className="flex items-center">
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
               <Avatar className="h-8 w-8">
@@ -189,7 +193,8 @@ export function DashboardNav() {
               <span>Sign out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );
