@@ -14,6 +14,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { DocumentLibrary } from './DocumentLibrary';
 import { Loader2 } from 'lucide-react';
+import { AuthGate } from '../auth/AuthGate';
 
 type Message = {
   _id: Id<'messages'>;
@@ -274,89 +275,91 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex h-full">
-      {/* Left Sidebar - Threads */}
-      <div className="w-64 border-r flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          <ChatSidebar
-            threads={threads}
-            selectedThreadId={selectedThreadId}
-            onSelectThreadAction={setSelectedThreadId}
-            onNewThreadAction={handleNewThread}
-            onDeleteThreadAction={handleDeleteThread}
-          />
+    <AuthGate>
+      <div className="flex h-full">
+        {/* Left Sidebar - Threads */}
+        <div className="w-64 border-r flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            <ChatSidebar
+              threads={threads}
+              selectedThreadId={selectedThreadId}
+              onSelectThreadAction={setSelectedThreadId}
+              onNewThreadAction={handleNewThread}
+              onDeleteThreadAction={handleDeleteThread}
+            />
+          </div>
+          
+          {/* Document Library Toggle */}
+          <div className="border-t p-2">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start"
+              onClick={() => setShowDocumentLibrary(!showDocumentLibrary)}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              {showDocumentLibrary ? 'Hide Documents' : 'Show Documents'}
+            </Button>
+          </div>
         </div>
         
-        {/* Document Library Toggle */}
-        <div className="border-t p-2">
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start"
-            onClick={() => setShowDocumentLibrary(!showDocumentLibrary)}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            {showDocumentLibrary ? 'Hide Documents' : 'Show Documents'}
-          </Button>
-        </div>
-      </div>
-      
-      {/* Document Library Sidebar */}
-      {showDocumentLibrary && channelId && (
-        <div className="w-80 border-r">
-          <DocumentLibrary channelId={channelId} />
-        </div>
-      )}
-
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col">
-        {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="flex-1 p-4 overflow-y-auto">
-            {!selectedThreadId ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">
-                  {threads.length === 0 ? 'No chats yet. Create a new chat to get started!' : 'Select a chat to start messaging'}
-                </p>
-              </div>
-            ) : messages === undefined ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-8 h-8 animate-spin" />
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">
-                  No messages yet. Send a message to start the conversation!
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <ChatMessage
-                  key={message._id}
-                  message={{
-                    ...message,
-                    authorId: message.authorId || '',
-                    authorName: message.authorName || 'AI',
-                    createdAt: message.createdAt,
-                  }}
-                  isCurrentUser={message.authorId === userId}
-                />
-              ))
-            )}
-            <div ref={messagesEndRef} />
+        {/* Document Library Sidebar */}
+        {showDocumentLibrary && channelId && (
+          <div className="w-80 border-r">
+            <DocumentLibrary channelId={channelId} />
           </div>
-        </ScrollArea>
+        )}
 
-        {/* Input */}
-        <div className="border-t p-4">
-          <ChatInput
-            threadId={selectedThreadId || ''}
-            userId={userId}
-            onSendMessageAction={handleMessageSent}
-            disabled={!selectedThreadId}
-            isSending={isSending}
-          />
+        {/* Main chat area */}
+        <div className="flex-1 flex flex-col">
+          {/* Messages */}
+          <ScrollArea className="flex-1 p-4">
+            <div className="flex-1 p-4 overflow-y-auto">
+              {!selectedThreadId ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">
+                    {threads.length === 0 ? 'No chats yet. Create a new chat to get started!' : 'Select a chat to start messaging'}
+                  </p>
+                </div>
+              ) : messages === undefined ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">
+                    No messages yet. Send a message to start the conversation!
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <ChatMessage
+                    key={message._id}
+                    message={{
+                      ...message,
+                      authorId: message.authorId || '',
+                      authorName: message.authorName || 'AI',
+                      createdAt: message.createdAt,
+                    }}
+                    isCurrentUser={message.authorId === userId}
+                  />
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Input */}
+          <div className="border-t p-4">
+            <ChatInput
+              threadId={selectedThreadId || ''}
+              userId={userId}
+              onSendMessageAction={handleMessageSent}
+              disabled={!selectedThreadId}
+              isSending={isSending}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </AuthGate>
   )
 }

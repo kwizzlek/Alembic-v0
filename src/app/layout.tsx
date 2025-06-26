@@ -37,8 +37,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
-        <ConvexClientProvider>
-          <AuthProvider initialSession={session}>
+        <AuthProvider initialSession={session}>
+          <ConvexClientProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
@@ -50,8 +50,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
                 <Toaster position="top-center" />
               </div>
             </ThemeProvider>
-          </AuthProvider>
-        </ConvexClientProvider>
+          </ConvexClientProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useMutation, useQuery, useConvexAuth } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import type { Id, Doc } from '../../../convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
@@ -22,13 +22,9 @@ type Document = Doc<'documents'> & {
 
 export function DocumentLibrary({ channelId }: { channelId: Id<'channels'> }) {
   const [isUploading, setIsUploading] = useState(false);
-  const { isLoading, isAuthenticated } = useConvexAuth();
   
   // Get documents for the current channel
-  const documents = useQuery(
-    api.documents.list,
-    isAuthenticated ? { channelId } : 'skip'
-  ) || [];
+  const documents = useQuery(api.documents.list, { channelId }) || [];
   const deleteDocument = useMutation(api.documents.remove);
   const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
   const saveStorageId = useMutation(api.documents.saveStorageId);
@@ -106,13 +102,7 @@ export function DocumentLibrary({ channelId }: { channelId: Id<'channels'> }) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-4 flex justify-center items-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+
 
   return (
     <div className="p-4">
